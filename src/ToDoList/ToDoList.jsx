@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import './todoliststyle.css';
+import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
 
 export default function TodoList() {
     const [tasks, setTasks] = useState([]);
-    const [taskText, setTaskText] = useState("");
+    const [taskText, setTaskText] = useState('');
     const [editTaskId, setEditTaskId] = useState(null);
 
     useEffect(() => {
@@ -12,6 +13,11 @@ export default function TodoList() {
             setTasks(JSON.parse(storedTasks));
         }
     }, []);
+
+    useEffect(() => {
+        const updatedTasks = [...tasks];
+        saveTasksToLocalStorage(updatedTasks);
+    }, [tasks]);
 
     const saveTasksToLocalStorage = (updatedTasks) => {
         localStorage.setItem('tasks', JSON.stringify(updatedTasks));
@@ -29,7 +35,6 @@ export default function TodoList() {
 
         const updatedTasks = [...tasks, newTask];
         setTasks(updatedTasks);
-        saveTasksToLocalStorage(updatedTasks);
         setTaskText('');
     };
 
@@ -54,15 +59,21 @@ export default function TodoList() {
         });
 
         setTasks(updatedTasks);
-        saveTasksToLocalStorage(updatedTasks);
         setTaskText('');
         setEditTaskId(null);
+    };
+
+    const handleDragEnd = (result) => {
+        if (!result.destination) return;
+        const reorderedTasks = Array.from(tasks);
+        const [reorderedItem] = reorderedTasks.splice(result.source.index, 1);
+        reorderedTasks.splice(result.destination.index, 0, reorderedItem);
+        setTasks(reorderedTasks);
     };
 
     const handleDeleteTask = (taskId) => {
         const updatedTasks = tasks.filter((task) => task.id !== taskId);
         setTasks(updatedTasks);
-        saveTasksToLocalStorage(updatedTasks);
         setEditTaskId(null);
     };
 
@@ -127,42 +138,66 @@ export default function TodoList() {
     return (
         <div className="todo-container" style={containerStyle}>
             <h2 style={{ color: 'white' }}>Tasks</h2>
-            <ul className="task-list" style={taskListStyle}>
-                {tasks.map((task) => (
-                    <li key={task.id} style={taskItemStyle}>
-                        {editTaskId === task.id ? (
-                            <>
-                                <input
-                                    type="text"
-                                    value={taskText}
-                                    onChange={(e) => setTaskText(e.target.value)}
-                                    className="task-input"
-                                    style={inputFieldStyle}
-                                />
-                                <button onClick={handleSaveTask} style={editButtonStyle}>
-                                    Save
-                                </button>
-                            </>
-                        ) : (
-                            <>
-                                {task.text}
-                                <button
-                                    onClick={() => handleEditTask(task.id)}
-                                    style={editButtonStyle}
-                                >
-                                    Edit
-                                </button>
-                                <button
-                                    onClick={() => handleDeleteTask(task.id)}
-                                    style={deleteButtonStyle}
-                                >
-                                    Delete
-                                </button>
-                            </>
-                        )}
-                    </li>
-                ))}
-            </ul>
+            <DragDropContext onDragEnd={handleDragEnd}>
+                <Droppable droppableId="taskList" type="TASK">
+                    {(provided) => (
+                        <ul
+                            {...provided.droppableProps}
+                            ref={provided.innerRef}
+                            className="task-list"
+                            style={taskListStyle}
+                        >
+                            {tasks.map((task, index) => (
+                                <Draggable key={task.id} draggableId={String(task.id)} index={index}>
+                                    {(provided) => (
+                                        <li
+                                            {...provided.draggableProps}
+                                            {...provided.dragHandleProps}
+                                            ref={provided.innerRef}
+                                            style={{
+                                                ...taskItemStyle,
+                                                ...provided.draggableProps.style,
+                                            }}
+                                        >
+                                            {editTaskId === task.id ? (
+                                                <>
+                                                    <input
+                                                        type="text"
+                                                        value={taskText}
+                                                        onChange={(e) => setTaskText(e.target.value)}
+                                                        className="task-input"
+                                                        style={inputFieldStyle}
+                                                    />
+                                                    <button onClick={handleSaveTask} style={editButtonStyle}>
+                                                        Save
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {task.text}
+                                                    <button
+                                                        onClick={() => handleEditTask(task.id)}
+                                                        style={editButtonStyle}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteTask(task.id)}
+                                                        style={deleteButtonStyle}
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </>
+                                            )}
+                                        </li>
+                                    )}
+                                </Draggable>
+                            ))}
+                            {provided.placeholder}
+                        </ul>
+                    )}
+                </Droppable>
+            </DragDropContext>
             <input
                 type="text"
                 value={taskText}
